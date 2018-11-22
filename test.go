@@ -26,7 +26,6 @@ func main() {
 	req.Header.Add("noencrypt", "1")
 	req.Header.Add("content-length", "563")
 	req.Header.Add("cache-control", "no-cache")
-	req.Header.Add("postman-token", "1a58d518-4bc3-679a-0955-58d174ec9537")
 
 	res, _ := http.DefaultClient.Do(req)
 
