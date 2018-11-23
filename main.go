@@ -1,17 +1,84 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
+type Data struct {
+	RoleName	string 	// 昵称
+	GameOnline	int		// 在线状态
+	RoleBigIcon	string 	// 头像
+	JobName		string 	// 段位
+	AllStar 	int 	// 段位升级需要星星的数量
+	RankingStar string 	// 当前星星
+	TotalCount 	int	    // 总场数
+	WinRate		string 	// 胜率
+	MvpNum 		int 	// MVP数量
+	RoleUrl 	string 	// 过往赛季概况的页面url
+}
+
+type ResultData struct {
+	Result 	   int
+	ReturnCode int
+	ReturnMsg  string
+	Time       string
+	Data       Data
+}
+
+var r ResultData
+
+func init() {
+}
+
 func main() {
 	// 读取配置文件, 获取游戏助手的Session及其配置信息
-	// 启动服务
+
 	// 激活监听函数, 轮询角色状态
-	getUserState()
+	stateChanged := make(chan bool)
+	getUserStateError := make(chan string) // 防止出现错误后继续访问接口
+	go lestenEventStart(stateChanged, getUserStateError)
+
+	// 启动服务
+
+	for {
+		select {
+			case <- stateChanged:
+				// push
+				fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", r.Data.GameOnline)
+
+			case <- getUserStateError:
+				fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", r.ReturnMsg)
+				return
+		}
+	}
+}
+
+func lestenEventStart(c chan bool, e chan string) {
+
+	currentState := 0
+
+	for {
+		getUserState()
+		// fmt.Println(r)
+
+		if r.Result != 0 {
+			e <- r.ReturnMsg
+			return
+		}
+
+		if r.Data.GameOnline != currentState {
+			c <- true 
+			currentState = r.Data.GameOnline
+		}
+
+		time.Sleep(3 * time.Second)
+	}
+	
 }
 
 func getUserState() {
@@ -24,7 +91,8 @@ func getUserState() {
 	req.Header.Add("cookie", "accessToken=15_JYoFMFjsUFK5lwjorQYbyCVstof6kBtkmjfu6xsUX5Di4--gHEcRkzDSz2JTFN9p9TcScZF8prPpqd-mT0AaE_cDRsHqv8WTnQeMuGRFINc; appOpenId=oFhrws5IUYTYRF7hnKV_9SYOgbNY")
 	req.Header.Add("host", "ssl.kohsocialapp.qq.com:10001")
 	req.Header.Add("content-type", "application/x-www-form-urlencoded")
-	req.Header.Add("accept-encoding", "br, gzip, deflate")
+	// req.Header.Add("accept-encoding", "br, gzip, deflate") // 没有解压, 有乱码
+	req.Header.Add("accept-encoding", "utf-8")
 	req.Header.Add("connection", "keep-alive")
 	req.Header.Add("accept", "*/*")
 	req.Header.Add("user-agent", "smoba/2.36.102 (iPhone; iOS 12.1; Scale/3.00)")
@@ -32,13 +100,17 @@ func getUserState() {
 	req.Header.Add("noencrypt", "1")
 	req.Header.Add("content-length", "563")
 	req.Header.Add("cache-control", "no-cache")
-	req.Header.Add("postman-token", "9e8bdaf5-b624-4a21-1c90-31c22523008a")
 
 	res, _ := http.DefaultClient.Do(req)
 
 	defer res.Body.Close()
 	body, _ := ioutil.ReadAll(res.Body)
 
-	fmt.Println(res)
-	fmt.Println(string(body))
+	// fmt.Println(res)
+	// fmt.Println(string(body))
+
+	// var r ResultData
+	json.Unmarshal([]byte(string(body)), &r)
+	// fmt.Println(r)
+	// r.Data.GameOnline = 3
 }
