@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,16 +15,16 @@ var token = "SydKGR8N"
 var cookie = "accessToken=16_NxZhosEUeFmVHTOt0h3_lMcKytG5SU4CPZaUdqi1uHpqoh867Jud8djQeapTaxjaf13KDZHqq6Z0ko6o7kxQ8QV0AxsCnI0648K69B2GEeo; appOpenId=oFhrws5IUYTYRF7hnKV_9SYOgbNY"
 
 type Data struct {
-	RoleName    string // 昵称
-	GameOnline  int    // 在线状态 0:离线 1:在线 2:正在游戏
-	RoleBigIcon string // 头像
-	JobName     string // 段位
-	AllStar     int    // 段位升级需要星星的数量
-	RankingStar string // 当前星星
-	TotalCount  int    // 总场数
-	WinRate     string // 胜率
-	MvpNum      int    // MVP数量
-	RoleUrl     string // 过往赛季概况的页面url
+	RoleName    string      // 昵称
+	GameOnline  interface{} // 在线状态 0:离线 1:在线 2:正在游戏
+	RoleBigIcon string      // 头像
+	JobName     string      // 段位
+	AllStar     int         // 段位升级需要星星的数量
+	RankingStar string      // 当前星星
+	TotalCount  int         // 总场数
+	WinRate     string      // 胜率
+	MvpNum      int         // MVP数量
+	RoleUrl     string      // 过往赛季概况的页面url
 }
 
 type ResultData struct {
@@ -64,7 +65,7 @@ func main() {
 
 func lestenEventStart(c chan bool, e chan string) {
 
-	currentState := 0
+	currentState := "0"
 
 	for {
 		getUserState()
@@ -75,12 +76,23 @@ func lestenEventStart(c chan bool, e chan string) {
 			return
 		}
 
-		if r.Data.GameOnline != currentState {
-			c <- true
-			currentState = r.Data.GameOnline
+		var _state = "0"
+		if state, ok := r.Data.GameOnline.(string); ok {
+			_state = state
+		} else if state, ok := r.Data.GameOnline.(int); ok {
+			_state = strconv.Itoa(state)
 		}
 
-		time.Sleep(60 * time.Second)
+		if _state != currentState {
+			c <- true
+			currentState = _state
+		}
+
+		// 随机间隔
+		rand.Seed(time.Now().UTC().UnixNano())
+		interval := rand.Intn(60) + 30
+		fmt.Println(interval, " 秒后再次请求")
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 
 }
