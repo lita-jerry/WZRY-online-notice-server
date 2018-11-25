@@ -11,8 +11,12 @@ import (
 	"time"
 )
 
+var roleId = "886872615" // 用户id
+
 var token = "SydKGR8N"
 var cookie = "accessToken=16_NxZhosEUeFmVHTOt0h3_lMcKytG5SU4CPZaUdqi1uHpqoh867Jud8djQeapTaxjaf13KDZHqq6Z0ko6o7kxQ8QV0AxsCnI0648K69B2GEeo; appOpenId=oFhrws5IUYTYRF7hnKV_9SYOgbNY"
+
+var eventloopCount = 0
 
 type Data struct {
 	RoleName    string      // 昵称
@@ -69,7 +73,7 @@ func lestenEventStart(c chan bool, e chan string) {
 
 	for {
 		getUserState()
-		fmt.Println(r)
+		// fmt.Println(r)
 
 		if r.Result != 0 {
 			e <- r.ReturnMsg
@@ -77,11 +81,28 @@ func lestenEventStart(c chan bool, e chan string) {
 		}
 
 		var _state = "0"
-		if state, ok := r.Data.GameOnline.(string); ok {
-			_state = state
-		} else if state, ok := r.Data.GameOnline.(int); ok {
-			_state = strconv.Itoa(state)
+
+		switch r.Data.GameOnline.(type) {
+		case string:
+			fmt.Println("string", r.Data.GameOnline.(string))
+			break
+		case int:
+			fmt.Println("int", r.Data.GameOnline.(int))
+			break
+		case float64:
+			fmt.Println("float64", r.Data.GameOnline.(float64))
+			break
 		}
+
+		if state, ok := r.Data.GameOnline.(int); ok {
+			_state = strconv.Itoa(state)
+		} else if state, ok := r.Data.GameOnline.(float64); ok {
+			_state = strconv.FormatFloat(state, 'G', -1, 64)
+		} else if state, ok := r.Data.GameOnline.(string); ok {
+			_state = state
+		}
+
+		fmt.Println("_state: ", _state)
 
 		if _state != currentState {
 			c <- true
@@ -90,8 +111,9 @@ func lestenEventStart(c chan bool, e chan string) {
 
 		// 随机间隔
 		rand.Seed(time.Now().UTC().UnixNano())
-		interval := rand.Intn(60) + 30
-		fmt.Println(interval, " 秒后再次请求")
+		interval := rand.Intn(90) + 30
+		eventloopCount += 1
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", currentState)
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 
@@ -101,11 +123,12 @@ func getUserState() {
 	url := "https://ssl.kohsocialapp.qq.com:10001/game/rolecard"
 
 	timestamp := strconv.FormatInt(time.Now().UnixNano()/1e6, 10)
-	fmt.Println(timestamp)
+	// fmt.Println(timestamp)
 
 	payload := strings.NewReader("apiVersion=4&cChannelId=0&cClientVersionCode=2018092102&cClientVersionName=2.36.102&cCurrentGameId=20001&cDeviceCPU=ARM64&cDeviceId=9c46d1c18fea063ce7ca478d8691e9ca8218914b&cDeviceMem=3134406656&cDeviceModel=iPhone&cDeviceNet=WiFi&cDeviceSP=%E4%B8%AD%E5%9B%BD%E8%81%94%E9%80%9A&cDeviceScreenHeight=736&cDeviceScreenWidth=414&cGameId=20001&cGzip=1" +
 		"&cRand=" + timestamp +
-		"&cSystem=ios&cSystemVersionCode=12.1&cSystemVersionName=iOS&friendUserId=&gameId=20001&isMI=0&myRoleId=892934648&platType=ios&roleId=886872615" +
+		"&cSystem=ios&cSystemVersionCode=12.1&cSystemVersionName=iOS&friendUserId=&gameId=20001&isMI=0&myRoleId=892934648&platType=ios" +
+		"&roleId=" + roleId +
 		"&token=" + token +
 		"&userId=460403972&versioncode=2018092102")
 
