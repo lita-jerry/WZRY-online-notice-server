@@ -10,7 +10,7 @@ Golang + MySQL
 
 对战详情页 | 玩家信息页
  -------------|-------------
-![对战详情页](resources/1.PNG) | ![玩家信息页](resources/1.PNG)
+![对战详情页](resources/1.jpg) | ![玩家信息页](resources/2.jpg)
 
 在线状态一旦改变, 通过`APP push`或`Socket`实现提醒, 并记录在数据库中, 实现统计、分析的功能
 
