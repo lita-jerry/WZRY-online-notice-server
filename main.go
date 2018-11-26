@@ -39,87 +39,112 @@ type ResultData struct {
 	Data       Data
 }
 
-var r ResultData
+// var r ResultData
 
 func init() {
 }
 
 func main() {
-	// 读取配置文件, 获取游戏助手的Session及其配置信息
 
 	// 激活监听函数, 轮询角色状态
-	stateChanged := make(chan bool)
+	stateChanged := make(chan string)
 	getUserStateError := make(chan string) // 防止出现错误后继续访问接口
-	go lestenEventStart(stateChanged, getUserStateError)
+	stopLestenEvent := make(chan bool)     // 停止监听用户状态
+
+	go lestenEventStart(stateChanged, getUserStateError, stopLestenEvent)
 
 	// 启动服务
 
+	// 监听goroutine消息
 	for {
 		select {
 		case <-stateChanged:
 			// push
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", r.Data.GameOnline)
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", stateChanged)
 
 		case <-getUserStateError:
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", r.ReturnMsg)
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", getUserStateError)
+			stopLestenEvent <- true
 			return
 		}
 	}
 }
 
-func lestenEventStart(c chan bool, e chan string) {
+func lestenEventStart(c chan string, e chan string, s chan bool) {
 
-	currentState := "0"
+	// currentState := "0"
+
+	// for {
+	// getUserState()
+	// fmt.Println(r)
+
+	// switch r.Data.GameOnline.(type) {
+	// case string:
+	// 	fmt.Println("string", r.Data.GameOnline.(string))
+	// 	break
+	// case int:
+	// 	fmt.Println("int", r.Data.GameOnline.(int))
+	// 	break
+	// case float64:
+	// 	fmt.Println("float64", r.Data.GameOnline.(float64))
+	// 	break
+	// }
+	// }
+
+	// 以下新写的
+	var state = "0"
+	rc := make(chan bool) // response channel
 
 	for {
-		getUserState()
-		// fmt.Println(r)
 
-		if r.Result != 0 {
-			e <- r.ReturnMsg
+		var r ResultData
+
+		go getUserState(&r, rc, 3)
+
+		select {
+		case <-rc:
+			// 读数据
+			fmt.Println(r)
+			if r.Result != 0 {
+				e <- r.ReturnMsg
+				return
+			}
+			//
+			r_state := "0"
+			if _state, ok := r.Data.GameOnline.(int); ok {
+				r_state = strconv.Itoa(_state)
+			} else if _state, ok := r.Data.GameOnline.(float64); ok {
+				r_state = strconv.FormatFloat(_state, 'G', -1, 64)
+			} else if _state, ok := r.Data.GameOnline.(string); ok {
+				r_state = _state
+			}
+			// 判断是否有变化
+			if state != r_state {
+				state = r_state
+				c <- state
+			}
+			// 随机间隔
+			rand.Seed(time.Now().UTC().UnixNano())
+			interval := rand.Intn(1) + 1
+			eventloopCount += 1
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", state)
+			time.Sleep(time.Duration(interval) * time.Second)
+			continue
+
+		case <-time.After(3 * time.Second):
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": Timeout!")
+			continue
+		case <-s:
 			return
 		}
-
-		var _state = "0"
-
-		switch r.Data.GameOnline.(type) {
-		case string:
-			fmt.Println("string", r.Data.GameOnline.(string))
-			break
-		case int:
-			fmt.Println("int", r.Data.GameOnline.(int))
-			break
-		case float64:
-			fmt.Println("float64", r.Data.GameOnline.(float64))
-			break
-		}
-
-		if state, ok := r.Data.GameOnline.(int); ok {
-			_state = strconv.Itoa(state)
-		} else if state, ok := r.Data.GameOnline.(float64); ok {
-			_state = strconv.FormatFloat(state, 'G', -1, 64)
-		} else if state, ok := r.Data.GameOnline.(string); ok {
-			_state = state
-		}
-
-		fmt.Println("_state: ", _state)
-
-		if _state != currentState {
-			c <- true
-			currentState = _state
-		}
-
-		// 随机间隔
-		rand.Seed(time.Now().UTC().UnixNano())
-		interval := rand.Intn(90) + 30
-		eventloopCount += 1
-		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", currentState)
-		time.Sleep(time.Duration(interval) * time.Second)
 	}
 
 }
 
-func getUserState() {
+func getUserState(r *ResultData, rc chan bool, timeout int) {
+
+	var startTime = time.Now()
+
 	url := "https://ssl.kohsocialapp.qq.com:10001/game/rolecard"
 
 	timestamp := strconv.FormatInt(time.Now().UnixNano()/1e6, 10)
@@ -156,7 +181,14 @@ func getUserState() {
 	// fmt.Println(string(body))
 
 	// var r ResultData
-	json.Unmarshal([]byte(string(body)), &r)
+	json.Unmarshal([]byte(string(body)), r)
 	// fmt.Println(r)
 	// r.Data.GameOnline = 3
+
+	// 解析gameOnline, 并转成string类型
+	// 判断是否超时
+	var endTime = time.Now()
+	if endTime.Sub(startTime).Seconds() < float64(timeout) {
+		rc <- true
+	}
 }
