@@ -47,85 +47,58 @@ func init() {
 func main() {
 
 	// 激活监听函数, 轮询角色状态
-	stateChanged := make(chan string)
-	getUserStateError := make(chan string) // 防止出现错误后继续访问接口
-	stopLestenEvent := make(chan bool)     // 停止监听用户状态
+	stateChangedChan := make(chan string)
+	getUserStateErrorChan := make(chan string) // 防止出现错误后继续访问接口
+	stopLestenEventChan := make(chan bool)     // 停止监听用户状态
 
-	go lestenEventStart(stateChanged, getUserStateError, stopLestenEvent)
+	go lestenEventStart(stateChangedChan, getUserStateErrorChan, stopLestenEventChan)
 
 	// 启动服务
 
 	// 监听goroutine消息
 	for {
 		select {
-		case <-stateChanged:
+		case changed := <-stateChangedChan:
 			// push
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", stateChanged)
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", changed)
 
-		case <-getUserStateError:
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", getUserStateError)
-			stopLestenEvent <- true
+		case err := <-getUserStateErrorChan:
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", err)
+			stopLestenEventChan <- true
 			return
 		}
 	}
 }
 
-func lestenEventStart(c chan string, e chan string, s chan bool) {
+func lestenEventStart(changedChan chan string, errorChan chan string, stopChan chan bool) {
 
-	// currentState := "0"
-
-	// for {
-	// getUserState()
-	// fmt.Println(r)
-
-	// switch r.Data.GameOnline.(type) {
-	// case string:
-	// 	fmt.Println("string", r.Data.GameOnline.(string))
-	// 	break
-	// case int:
-	// 	fmt.Println("int", r.Data.GameOnline.(int))
-	// 	break
-	// case float64:
-	// 	fmt.Println("float64", r.Data.GameOnline.(float64))
-	// 	break
-	// }
-	// }
-
-	// 以下新写的
-	var state = "0"
-	rc := make(chan bool) // response channel
+	var state interface{} = "0"
+	requestFinishedChan := make(chan bool)
 
 	for {
 
-		var r ResultData
+		var resultData ResultData
 
-		go getUserState(&r, rc, 3)
+		go getUserState(&resultData, requestFinishedChan, 3)
 
 		select {
-		case <-rc:
+		case <-requestFinishedChan:
 			// 读数据
-			fmt.Println(r)
-			if r.Result != 0 {
-				e <- r.ReturnMsg
+			// fmt.Println(resultData)
+			if resultData.Result != 0 || resultData.ReturnCode != 0 {
+				errorChan <- resultData.ReturnMsg
 				return
 			}
-			//
-			r_state := "0"
-			if _state, ok := r.Data.GameOnline.(int); ok {
-				r_state = strconv.Itoa(_state)
-			} else if _state, ok := r.Data.GameOnline.(float64); ok {
-				r_state = strconv.FormatFloat(_state, 'G', -1, 64)
-			} else if _state, ok := r.Data.GameOnline.(string); ok {
-				r_state = _state
-			}
 			// 判断是否有变化
-			if state != r_state {
-				state = r_state
-				c <- state
+			if state != resultData.Data.GameOnline {
+				state = resultData.Data.GameOnline
+				if changedState, ok := state.(string); ok {
+					changedChan <- changedState
+				}
 			}
 			// 随机间隔
 			rand.Seed(time.Now().UTC().UnixNano())
-			interval := rand.Intn(1) + 1
+			interval := rand.Intn(33) + 20
 			eventloopCount += 1
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", state)
 			time.Sleep(time.Duration(interval) * time.Second)
@@ -134,14 +107,14 @@ func lestenEventStart(c chan string, e chan string, s chan bool) {
 		case <-time.After(3 * time.Second):
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": Timeout!")
 			continue
-		case <-s:
+		case <-stopChan:
 			return
 		}
 	}
 
 }
 
-func getUserState(r *ResultData, rc chan bool, timeout int) {
+func getUserState(response *ResultData, requestFinishedChan chan bool, timeout int) {
 
 	var startTime = time.Now()
 
@@ -180,15 +153,23 @@ func getUserState(r *ResultData, rc chan bool, timeout int) {
 	// fmt.Println(res)
 	// fmt.Println(string(body))
 
-	// var r ResultData
-	json.Unmarshal([]byte(string(body)), r)
-	// fmt.Println(r)
-	// r.Data.GameOnline = 3
+	// var response ResultData
+	json.Unmarshal([]byte(string(body)), response)
 
 	// 解析gameOnline, 并转成string类型
+	r_state := "0"
+	if _state, ok := response.Data.GameOnline.(int); ok {
+		r_state = strconv.Itoa(_state)
+	} else if _state, ok := response.Data.GameOnline.(float64); ok {
+		r_state = strconv.FormatFloat(_state, 'G', -1, 64)
+	} else if _state, ok := response.Data.GameOnline.(string); ok {
+		r_state = _state
+	}
+	response.Data.GameOnline = r_state
+
 	// 判断是否超时
 	var endTime = time.Now()
 	if endTime.Sub(startTime).Seconds() < float64(timeout) {
-		rc <- true
+		requestFinishedChan <- true
 	}
 }
