@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+var startTime = 11 // 每天开始时间, 单位:小时
+var duration = 12  // 运行持续时间, 单位:小时
+
 var roleId = "886872615" // 用户id
 
 var token = "SydKGR8N"
@@ -76,6 +79,13 @@ func lestenEventStart(changedChan chan string, errorChan chan string, stopChan c
 	requestFinishedChan := make(chan bool)
 
 	for {
+
+		// 判断是否在可执行时间范围内
+		currentTimeHour := time.Now().Hour()
+		if !(currentTimeHour >= startTime && currentTimeHour <= (currentTimeHour+duration)) {
+			time.Sleep(60)
+			continue
+		}
 
 		var resultData ResultData
 
