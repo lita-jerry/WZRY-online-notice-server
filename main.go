@@ -95,8 +95,8 @@ func lestenEventStart(changedChan chan string, errorChan chan string, stopChan c
 
 		// 判断是否在可执行时间范围内
 		currentTimeHour := time.Now().Hour()
-		if !(currentTimeHour >= startTime && currentTimeHour <= (currentTimeHour+duration)) {
-			time.Sleep(60)
+		if !(currentTimeHour >= startTime && currentTimeHour <= (startTime+duration)) {
+			time.Sleep(60 * time.Second)
 			continue
 		}
 
