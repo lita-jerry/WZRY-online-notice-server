@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -20,6 +21,8 @@ var token = "SydKGR8N"
 var cookie = "accessToken=16_NxZhosEUeFmVHTOt0h3_lMcKytG5SU4CPZaUdqi1uHpqoh867Jud8djQeapTaxjaf13KDZHqq6Z0ko6o7kxQ8QV0AxsCnI0648K69B2GEeo; appOpenId=oFhrws5IUYTYRF7hnKV_9SYOgbNY"
 
 var eventloopCount = 0
+
+var returnData ResultData
 
 type Data struct {
 	RoleName    string      // 昵称
@@ -42,11 +45,6 @@ type ResultData struct {
 	Data       Data
 }
 
-// var r ResultData
-
-func init() {
-}
-
 func main() {
 
 	// 激活监听函数, 轮询角色状态
@@ -57,6 +55,11 @@ func main() {
 	go lestenEventStart(stateChangedChan, getUserStateErrorChan, stopLestenEventChan)
 
 	// 启动服务
+	http.HandleFunc("/", getStateServer)
+	err := http.ListenAndServe(":9090", nil)
+	if err != nil {
+		log.Fatal("ListenAndServer: ", err)
+	}
 
 	// 监听goroutine消息
 	for {
@@ -71,6 +74,16 @@ func main() {
 			return
 		}
 	}
+}
+
+func getStateServer(w http.ResponseWriter, r *http.Request) {
+	// r.ParseForm()
+	b, err := json.Marshal(returnData)
+	if err != nil {
+		fmt.Println("json err:", err)
+		return
+	}
+	fmt.Fprint(w, string(b))
 }
 
 func lestenEventStart(changedChan chan string, errorChan chan string, stopChan chan bool) {
@@ -95,6 +108,9 @@ func lestenEventStart(changedChan chan string, errorChan chan string, stopChan c
 		case <-requestFinishedChan:
 			// 读数据
 			// fmt.Println(resultData)
+
+			returnData = resultData // 传给服务端返回的值
+
 			if resultData.Result != 0 || resultData.ReturnCode != 0 {
 				errorChan <- resultData.ReturnMsg
 				return
