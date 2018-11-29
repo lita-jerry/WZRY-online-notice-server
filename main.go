@@ -55,11 +55,13 @@ func main() {
 	go lestenEventStart(stateChangedChan, getUserStateErrorChan, stopLestenEventChan)
 
 	// 启动服务
-	http.HandleFunc("/", getStateServer)
-	err := http.ListenAndServe(":9090", nil)
-	if err != nil {
-		log.Fatal("ListenAndServer: ", err)
-	}
+	go func() {
+		http.HandleFunc("/", getStateServer)
+		err := http.ListenAndServe(":9090", nil)
+		if err != nil {
+			log.Fatal("ListenAndServer: ", err)
+		}
+	}()
 
 	// 监听goroutine消息
 	for {
