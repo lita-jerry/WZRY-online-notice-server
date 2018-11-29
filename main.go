@@ -23,6 +23,7 @@ var cookie = "accessToken=16_NxZhosEUeFmVHTOt0h3_lMcKytG5SU4CPZaUdqi1uHpqoh867Ju
 var eventloopCount = 0
 
 var returnData ResultData
+var lastState = "0"
 
 type Data struct {
 	RoleName    string      // 昵称
@@ -69,6 +70,10 @@ func main() {
 		case changed := <-stateChangedChan:
 			// push
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", changed)
+			if lastState == "0" && changed == "1" {
+				go sendOnlineStateMSG()
+				lastState = changed
+			}
 
 		case err := <-getUserStateErrorChan:
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", err)
@@ -90,7 +95,7 @@ func getStateServer(w http.ResponseWriter, r *http.Request) {
 
 func lestenEventStart(changedChan chan string, errorChan chan string, stopChan chan bool) {
 
-	var state interface{} = "0"
+	// var state interface{} = "0"
 	requestFinishedChan := make(chan bool)
 
 	for {
@@ -118,17 +123,16 @@ func lestenEventStart(changedChan chan string, errorChan chan string, stopChan c
 				return
 			}
 			// 判断是否有变化
-			if state != resultData.Data.GameOnline {
-				state = resultData.Data.GameOnline
-				if changedState, ok := state.(string); ok {
-					changedChan <- changedState
+			if currentState, ok := resultData.Data.GameOnline.(string); ok {
+				if currentState != lastState {
+					changedChan <- currentState
 				}
 			}
 			// 随机间隔
 			rand.Seed(time.Now().UTC().UnixNano())
 			interval := rand.Intn(33) + 20
 			eventloopCount += 1
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", state)
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", lastState)
 			time.Sleep(time.Duration(interval) * time.Second)
 			continue
 
@@ -200,4 +204,26 @@ func getUserState(response *ResultData, requestFinishedChan chan bool, timeout i
 	if endTime.Sub(startTime).Seconds() < float64(timeout) {
 		requestFinishedChan <- true
 	}
+}
+
+func sendOnlineStateMSG() {
+	url := "https://u.ifeige.cn/api/message/send"
+
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
+
+	payload := strings.NewReader("{\"secret\":\"31a6732b116424c43e35e371e079459d\",\"app_key\":\"4ad89f97be527df43992c53c27390edf\",\"template_id\":\"odbtM60xeWsGXJEnOn6XL7MzvOJ3mMkkvP0lruBW4Og\",\"url\":\"\",\"data\":{\"first\":{\"value\":\"楚慷慷上线啦！\",\"color\":\"#173177\"},\"keyword1\":{\"value\":\"+我yi个\",\"color\":\"#173177\"},\"keyword2\":{\"value\":\"" + currentTime + "\",\"color\":\"#173177\"},\"keyword3\":{\"value\":\"唐山\",\"color\":\"#173177\"},\"keyword4\":{\"value\":\"\",\"color\":\"#173177\"},\"remark\":{\"value\":\"\",\"color\":\"#173177\"}}}")
+
+	req, _ := http.NewRequest("POST", url, payload)
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("cache-control", "no-cache")
+	req.Header.Add("Postman-Token", "873a72e7-2d34-4b2c-a1ab-c5ea543e6a8c")
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+	body, _ := ioutil.ReadAll(res.Body)
+
+	fmt.Println(res)
+	fmt.Println(string(body))
 }
