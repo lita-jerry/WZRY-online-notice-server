@@ -21,5 +21,5 @@ Golang + MySQL
 - [x] 实现定制化时间, 因为每天有固定的请求限额, 尽量分散在需要监听的时间段
 - [x] 实现状态查询的接口服务
 - [ ] 实现状态变更后的持久, 用户状态变更需要保存在数据库中
-- [ ] 实现推送功能, 计划使用[信鸽推送](https://xg.qq.com/), 已支持[服务端Golang接口](https://github.com/xingePush/xinge-api-Golang)
+- [x] 实现推送功能, 使用[飞鸽快信](http://ifeige.cn/)
 - [ ] 实现`Socket`连接, 更快速推送状态变更消息
