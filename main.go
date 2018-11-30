@@ -72,8 +72,8 @@ func main() {
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "stateChanged: ", changed)
 			if lastState == "0" && changed == "1" {
 				go sendOnlineStateMSG()
-				lastState = changed
 			}
+			lastState = changed
 
 		case err := <-getUserStateErrorChan:
 			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "getUserStateError: ", err)
