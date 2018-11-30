@@ -132,7 +132,7 @@ func lestenEventStart(changedChan chan string, errorChan chan string, stopChan c
 			rand.Seed(time.Now().UTC().UnixNano())
 			interval := rand.Intn(33) + 20
 			eventloopCount += 1
-			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", lastState)
+			fmt.Println(time.Now().Format("2006-01-02 15:04:05"), ": ", interval, "秒后再次请求 当前循环次数:", eventloopCount, " 当前状态:", currentState)
 			time.Sleep(time.Duration(interval) * time.Second)
 			continue
 
